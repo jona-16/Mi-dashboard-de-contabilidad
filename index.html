@@ -1,0 +1,255 @@
+<!DOCTYPE html><html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard Bomba</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-bottom: 20px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #e0e0e0;
+    }
+    input[type="number"] {
+      width: 80px;
+    }
+    .button-container {
+      margin-top: 20px;
+    }
+    button {
+      padding: 10px 15px;
+      margin-right: 10px;
+      cursor: pointer;
+    }
+    #factura, #historialModal {
+      background-color: white;
+      padding: 20px;
+      border: 1px solid #ccc;
+      margin-top: 20px;
+    }
+    #historialModal {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: white;
+      padding: 20px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.3);
+      z-index: 9999;
+      display: none;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <h2>Dashboard de Contabilidad - Estación de Combustible</h2>
+  <label>Fecha: <input type="date" id="fecha"></label>
+  <label>Nombre: <input type="text" id="nombre"></label>
+  <label>Turno: <input type="text" id="turno"></label>  <table id="tabla">
+    <thead>
+      <tr>
+        <th>Manguera</th>
+        <th>Precio</th>
+        <th>Abrió</th>
+        <th>Cerró</th>
+        <th>Galones</th>
+        <th>Ingresos</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>  <div class="button-container">
+    <button onclick="calcular()">Calcular</button>
+    <button onclick="mostrarResultado()">Resultado</button>
+    <button onclick="editarTabla()">Editar</button>
+    <button onclick="editarPrecios()">Editar Precios</button>
+    <button onclick="limpiarAbrioCerro()">Limpiar</button>
+    <button onclick="guardar()">Guardar</button>
+    <button onclick="mostrarHistorial()">Historial Guardado</button>
+    <button onclick="toggleFactura()">Mostrar/Ocultar Factura</button>
+  </div>  <div style="margin-top: 20px">
+    <label>Depósito (RD$): <input type="number" id="deposito" value="0"></label>
+    <label>Verifon (RD$): <input type="number" id="verifon" value="0"></label>
+  </div>  <div id="factura" style="display: none;"></div>  <div id="historialModal"></div>  <script>
+    const nombres = [
+      'C1-M1', 'C1-M2', 'C1-M3', 'C1-M4',
+      'C2-M1', 'C2-M2', 'C2-M3', 'C2-M4'
+    ];
+    const preciosIniciales = [
+      242.10, 224.80, 272.50, 290.10,
+      242.10, 224.80, 272.50, 290.10
+    ];
+
+    let data = JSON.parse(localStorage.getItem('tablaData')) || preciosIniciales.map((precio, i) => ({
+      nombre: nombres[i],
+      precio,
+      abrio: 0,
+      cerro: 0,
+      galones: 0,
+      ingresos: 0
+    }));
+
+    function renderTabla() {
+      const tbody = document.querySelector('tbody');
+      tbody.innerHTML = '';
+      data.forEach((row, i) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${row.nombre}</td>
+          <td><input class="precio" type="number" value="${row.precio}" disabled /></td>
+          <td><input class="abrio" type="number" value="${row.abrio}" onchange="actualizarValor(${i}, 'abrio', this.value)" /></td>
+          <td><input class="cerro" type="number" value="${row.cerro}" onchange="actualizarValor(${i}, 'cerro', this.value)" /></td>
+          <td><input class="galones" type="number" value="${row.galones}" disabled /></td>
+          <td><input class="ingresos" type="number" value="${row.ingresos}" disabled /></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function actualizarValor(index, campo, valor) {
+      data[index][campo] = parseFloat(valor) || 0;
+      localStorage.setItem('tablaData', JSON.stringify(data));
+    }
+
+    function calcular() {
+      data.forEach((row, i) => {
+        const galones = row.cerro - row.abrio;
+        const ingresos = galones * row.precio;
+        row.galones = galones;
+        row.ingresos = ingresos;
+      });
+      localStorage.setItem('tablaData', JSON.stringify(data));
+      renderTabla();
+    }
+
+    function mostrarResultado() {
+      let total = data.reduce((sum, r) => sum + r.ingresos, 0);
+      const deposito = parseFloat(document.getElementById('deposito').value) || 0;
+      const verifon = parseFloat(document.getElementById('verifon').value) || 0;
+      const final = total - deposito - verifon;
+
+      let html = `<h3>Factura de ${document.getElementById('nombre').value}</h3>`;
+      html += `<p>Fecha: ${document.getElementById('fecha').value} | Turno: ${document.getElementById('turno').value}</p>`;
+      html += '<table><tr><th>Manguera</th><th>Galones</th><th>Precio</th><th>Ingreso</th></tr>';
+      data.forEach(r => {
+        html += `<tr><td>${r.nombre}</td><td>${r.galones.toFixed(2)}</td><td>RD$ ${r.precio.toFixed(2)}</td><td>RD$ ${r.ingresos.toFixed(2)}</td></tr>`;
+      });
+      html += `<tr><td colspan="3"><strong>Total</strong></td><td><strong>RD$ ${total.toFixed(2)}</strong></td></tr>`;
+      html += `<tr><td colspan="3">Menos Depósito</td><td>- RD$ ${deposito.toFixed(2)}</td></tr>`;
+      html += `<tr><td colspan="3">Menos Verifon</td><td>- RD$ ${verifon.toFixed(2)}</td></tr>`;
+      html += `<tr><td colspan="3"><strong>Total Final</strong></td><td><strong>RD$ ${final.toFixed(2)}</strong></td></tr>`;
+      html += '</table>';
+
+      document.getElementById('factura').innerHTML = html;
+      document.getElementById('factura').style.display = 'block';
+    }
+
+    function toggleFactura() {
+      const factura = document.getElementById('factura');
+      factura.style.display = factura.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function editarTabla() {
+      document.querySelectorAll('tbody input').forEach(input => {
+        if (!input.classList.contains('precio')) {
+          input.disabled = false;
+        }
+      });
+    }
+
+    function editarPrecios() {
+      document.querySelectorAll('.precio').forEach(input => {
+        input.disabled = false;
+      });
+    }
+
+    function limpiarAbrioCerro() {
+      data.forEach(row => {
+        row.abrio = 0;
+        row.cerro = 0;
+        row.galones = 0;
+        row.ingresos = 0;
+      });
+      localStorage.setItem('tablaData', JSON.stringify(data));
+      renderTabla();
+    }
+
+    function guardar() {
+      let historial = JSON.parse(localStorage.getItem('historial')) || [];
+      const registro = {
+        fecha: document.getElementById('fecha').value,
+        nombre: document.getElementById('nombre').value,
+        turno: document.getElementById('turno').value,
+        deposito: parseFloat(document.getElementById('deposito').value) || 0,
+        verifon: parseFloat(document.getElementById('verifon').value) || 0,
+        data: JSON.parse(JSON.stringify(data))
+      };
+      historial.push(registro);
+      localStorage.setItem('historial', JSON.stringify(historial));
+      alert("Guardado exitosamente.");
+    }
+
+    function mostrarHistorial() {
+      const historial = JSON.parse(localStorage.getItem('historial')) || [];
+      const modal = document.getElementById('historialModal');
+      modal.innerHTML = '<h3>Historial de Registros</h3>';
+      historial.forEach((registro, i) => {
+        let total = registro.data.reduce((sum, r) => sum + r.ingresos, 0);
+        const final = total - registro.deposito - registro.verifon;
+        modal.innerHTML += `
+          <div style="border: 1px solid #ccc; padding: 10px; margin-bottom: 10px">
+            <strong>${registro.fecha} - ${registro.nombre} - Turno: ${registro.turno}</strong>
+            <button onclick="eliminarRegistro(${i})">Eliminar</button>
+            <table style="margin-top: 10px; width: 100%">
+              <thead><tr><th>Manguera</th><th>Galones</th><th>Precio</th><th>Ingreso</th></tr></thead>
+              <tbody>
+                ${registro.data.map(r => `
+                  <tr>
+                    <td>${r.nombre}</td>
+                    <td>${r.galones.toFixed(2)}</td>
+                    <td>RD$ ${r.precio.toFixed(2)}</td>
+                    <td>RD$ ${r.ingresos.toFixed(2)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+              <tfoot>
+                <tr><td colspan="3"><strong>Total</strong></td><td><strong>RD$ ${total.toFixed(2)}</strong></td></tr>
+                <tr><td colspan="3">Menos Depósito</td><td>- RD$ ${registro.deposito.toFixed(2)}</td></tr>
+                <tr><td colspan="3">Menos Verifon</td><td>- RD$ ${registro.verifon.toFixed(2)}</td></tr>
+                <tr><td colspan="3"><strong>Total Final</strong></td><td><strong>RD$ ${final.toFixed(2)}</strong></td></tr>
+              </tfoot>
+            </table>
+          </div>
+        `;
+      });
+      modal.innerHTML += '<button onclick="cerrarHistorial()">Cerrar</button>';
+      modal.style.display = 'block';
+    }
+
+    function eliminarRegistro(index) {
+      let historial = JSON.parse(localStorage.getItem('historial')) || [];
+      historial.splice(index, 1);
+      localStorage.setItem('historial', JSON.stringify(historial));
+      mostrarHistorial();
+    }
+
+    function cerrarHistorial() {
+      document.getElementById('historialModal').style.display = 'none';
+    }
+
+    // Render inicial
+    renderTabla();
+  </script></body>
+</html>
