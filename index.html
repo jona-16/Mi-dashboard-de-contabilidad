@@ -88,9 +88,15 @@
       'C2-M1', 'C2-M2', 'C2-M3', 'C2-M4'
     ];
     const preciosIniciales = [
-      242.10, 224.80, 272.50, 290.10,
-      242.10, 224.80, 272.50, 290.10
-    ];
+  341.10, // Gasolina Premium
+  310.50, // Gasolina Regular
+  293.10, // Diesel Premium
+  262.80, // Diesel Regular
+  341.10,
+  310.50,
+  293.10,
+  262.80
+];
 
     let data = JSON.parse(localStorage.getItem('tablaData')) || preciosIniciales.map((precio, i) => ({
       nombre: nombres[i],
@@ -168,12 +174,20 @@
         }
       });
     }
-
     function editarPrecios() {
-      document.querySelectorAll('.precio').forEach(input => {
-        input.disabled = false;
-      });
-    }
+  document.querySelectorAll('.precio').forEach((input, index) => {
+    input.disabled = false;
+
+    input.onchange = function () {
+      data[index].precio = parseFloat(this.value) || 0;
+
+      // Guardar inmediatamente los nuevos precios
+      localStorage.setItem('tablaData', JSON.stringify(data));
+
+      alert('Precio actualizado y guardado correctamente.');
+    };
+  });
+}
 
     function limpiarAbrioCerro() {
       data.forEach(row => {
